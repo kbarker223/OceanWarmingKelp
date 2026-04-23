@@ -1,0 +1,475 @@
+---
+title: "EEMB 146 Final Project"
+author: "Kai Barker"
+date: "2026-03-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# set echo to false so the code doesnt show up in the knitted output
+#get rid of message and warning as well so the doc looks as clean as possible
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+# Kai Barker: Examining the Effects of Temperature and Acidification on the Growth of *Neoagarum fimbriatum*
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+#load the data and packages
+#dataset 145
+kelp_data <- read.csv("data/dataset_145.csv")
+
+#for pipe operator and for graphing
+#citation: Wickham H, Averick M, Bryan J, Chang W, McGowan LD, François R, Grolemund G, Hayes A, Henry L, Hester J, Kuhn M, Pedersen TL, Miller E, Bache SM, Müller K, Ooms J, Robinson D, Seidel DP, Spinu V, Takahashi K, Vaughan D, Wilke C, Woo K, Yutani H (2019). “Welcome to the tidyverse.” Journal of Open Source Software, 4(43), 1686. doi:10.21105/joss.01686.
+library(tidyverse)
+
+#citation: Wickham H (2016). ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York. ISBN 978-3-319-24277-4, https://ggplot2.tidyverse.org.
+library(ggplot2)
+
+#for levenes test and for VIF
+#Fox J, Weisberg S (2019). An R Companion to Applied Regression, Third edition. Sage, Thousand Oaks CA. https://www.john-fox.ca/Companion/.
+library(car)
+
+#for making my tables look nice in the results section
+#Xie Y (2014). “knitr: A Comprehensive Tool for Reproducible Research in R.” In Stodden V, Leisch F, Peng RD (eds.), Implementing Reproducible Computational Research. Chapman and Hall/CRC. ISBN 978-1466561595.
+library(knitr)
+```
+
+## Abstract
+
+This study aims to understand the effects of temperature and pH on kelp growth to demonstrate how changing climate conditions could potentially impact ocean ecosystems. Using a dataset compiled by BCO-DMO containing kelp growth data, temperature, and pH conditions we can test our hypothesis that both factors will have an effect on the growth of the kelp species *Neoagarum fimbriatum*. To test this hypothesis, we ran both a two-sample t-test and fit a linear model to interpret the effects of these variables on kelp growth. It was found that the effects of the pH groups were an insignificant influence, while temperature and the starting weight of the kelp did play a more important role. With global temperatures continuing to rise, this study points to the possible impacts to many marine ecosystems. 
+
+## Introduction
+
+Kelp forests are vital ecosystems in marine environments, providing habitat, nursery grounds, and food resources for numerous species while playing a critical role in creating fuel for the marine food chain (Britton et al., 2016; Fernández et al., 2015). High-latitude kelp forests are increasingly exposed to two main stressors, ocean warming (OW) and ocean acidification (OA). By 2100, surface ocean pH is projected to decline by approximately 0.3-0.4 units and $CO_2$ concentrations are expected to double relative to current levels (Fernández et al., 2015).  
+  
+The response of kelp species to these factors are highly variable and dependent on the species itself. Responses to elevated $CO_2$ levels depend heavily on the species' carbon acquisition strategy and broader environmental and seasonal factors. For *Macrocystis pyrifera* specifically, neither photosynthetic nor growth rates were significantly affected by elevated $CO_2$ and reduced pH projected for the end of the century, likely due to its efficient use of $HCO_3-$ (bicarbonate) as a carbon source (Fernández et al., 2015). However, the authors note that the effects of OA combined with temperature and availability of nutrients could alter this response. Similarly, Britton et al. (2016) found that while natural changes in pH benefited *Ecklonia radiata* growth under simulated current conditions, it saw a negative effect on growth rates under simulated OA conditions. Thus we observe that kelp species responses are dependent on environmental and seasonal conditions.  
+  
+Seasonal variation in light and nutrient availability only further complicates these interactions, particularly at high latitudes where winter conditions limit primary production (Kroeker, BCO-DMO). In our study, we utilize the dataset collected by Dr. Kristy Kroeker and her Ph.D. student Lauren Bell (of UC Santa Cruz). Through two month-long laboratory experiments in Alaska representing winter (February 12-March 18 2020) and summer (August 15-September 16, 2020) seasonal conditions, they examined the effects of temperature and pH on three high-latitude kelp species. These species were the Giant Kelp (*Macrocystis pyrifera*) and two understory species (*Neoagarum fimbriatum* and *Hedophyllum nigripes*). Findings from this research suggest that *Macrocystis pyrifera* showed resilience to projected warming temperatures and acidification, while the understory kelps showed a decrease in biomass and nutritional quality under warming conditions (Kroeker, BCO-DMO).
+
+For the purposes of our paper, we will only study one of the understory kelp species *Neoagarum fimbriatum* (NFIM), and the change in its growth dependent on pH and temperature. There will be four variables studied, the starting wet weight of the kelp after it has been trimmed down to ~10cm (measured in grams), the change in wet weight from the start to the end of the measured experiment (g), the temperature (control/OW), and the pH (control/OA). Over the one species of kelp, we have 144 observations in the dataset. This research paper aims to answer if ocean warming and acidification will negatively impact kelp growth. Thus, we hypothesize that both temperature and pH will have a statistically significant effect on the growth of *Neoagarum fimbriatum*.
+
+## Exploratory Data Analysis
+
+First we will select the variables from the dataset (Appendix 1) and visualize the distributions of our numeric variables of interest, the change in wet weight (change_ww) and the starting wet weight (START_ww).
+```{r, fig.width=6, echo = FALSE, message=FALSE, warning=FALSE, fig.cap="**Figure 1: Histogram of Kelp Change in Wet Weight**"}
+#Appendix 1
+
+# we want to subset the data like we did in the project check in
+kelp_subset <- kelp_data %>% 
+  select(Temp, pH, START_ww, change_ww)
+
+clean_kelp <- kelp_subset %>% #select all columns included in analysis
+  drop_na()
+
+#also change the categorical variables to factors
+clean_kelp$Temp <- as.factor(clean_kelp$Temp)
+clean_kelp$pH <- as.factor(clean_kelp$pH)
+
+# first lets start by visualizing the different variables
+# plot the histograms of the numeric y
+
+ggplot(clean_kelp, aes(x=change_ww)) +
+  geom_histogram(binwidth=1, color="black", fill="skyblue") + 
+  labs(x="Change in Wet Weight (g)", y="Frequency", title="Distribution of Kelp Change in Wet Weight") +
+  theme_minimal()
+```
+```{r, fig.width=6, echo = FALSE, message=FALSE, warning=FALSE, fig.cap="**Figure 2: Histogram of Kelp Change in Wet Weight**"}
+# then histogram for numeric x
+ggplot(clean_kelp, aes(x=START_ww)) +
+  geom_histogram(binwidth=1, color="black", fill="darkseagreen") + 
+  labs(x="Starting Wet Weight (g)", y="Frequency", title="Distribution of Kelp Starting Wet Weight") +
+  theme_minimal()
+```
+
+  
+We can observe from Figures 1 and 2 that the distribution of the change in wet weight does not appear normally distributed, as the distribution is significantly right skewed, with an apparent outlier around 35. However, the distribution of the starting wet weight appears more normally distributed with no distinct outliers. Both variables show a wide range of values with most values being clustered under 10g for the change, and most values clustered between 4-8g for the starting weight.  
+  
+Additionally we will check the normality of our dependent variable, change_ww.
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.cap="**Table 1: Output of Shapiro-Wilk Test for Change in Wet Weight**"}
+# then since it doesnt look normal check shapiro wilk/qqplot and then transform and check that
+shap_change <- shapiro.test(clean_kelp$change_ww)
+shap_table1 <- data.frame(W=shap_change$statistic, p_value=shap_change$p.value)
+kable(shap_table1, digits=12, caption="Table 1: Change in Wet Weight Shapiro-Wilk Results")
+```
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.cap="**Figure 3: Q-Q Plot for Change in Kelp Wet Weight**"}
+#make the qqplot and add labels
+qqPlot(clean_kelp$change_ww, xlab="Theoretical Quantiles", ylab="Sample Quantiles", main="Q-Q Plot for Change in Kelp Wet Weight (g)")
+```
+
+
+After performing a Shapiro-Wilk Normality test (Table 1), we can observe a p-value of $2.472e-11$, so at significance level $\alpha = 0.05$, we can conclude that the data significantly deviates from a normal distribution. Furthermore, in Figure 3 the change_ww variable visibly shows a significant deviation from the normal line and outside of the blue confidence bands. Thus we will try log and square root transforming the dependent variable to evaluate if that affects normality. 
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.cap="**Tables 2 & 3: Outputs of Shapiro-Wilk Tests for Transformed Wet Weight Change (Log and Sqrt Respectively)**"}
+#try log
+shap_logchange <- shapiro.test(log(clean_kelp$change_ww+1))
+#try sqrt
+shap_sqrtchange <- shapiro.test(sqrt(clean_kelp$change_ww))
+
+shap_table2 <- data.frame(W=shap_logchange$statistic, p_value=shap_logchange$p.value)
+shap_table3 <- data.frame(W=shap_sqrtchange$statistic, p_value=shap_sqrtchange$p.value)
+kable(shap_table2, caption="Table 2: Log Change in Wet Weight Shapiro-Wilk Results", row.names=FALSE)
+kable(shap_table3, caption="Table 3: Sqrt Change in Wet Weight Shapiro-Wilk Results", row.names=FALSE)
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=6, fig.cap="**Figures 4 & 5: Q-Q Plots for Transformed Change in Wet Weight (Log and Sqrt Respectively)**"}
+#qqplots and label them, for the log and sqrt transforms
+qqPlot(log(clean_kelp$change_ww+1), xlab="Theoretical Quantiles", ylab="Sample Quantiles", main="Q-Q Plot for Log Change in Kelp Wet Weight (g)")
+qqPlot(sqrt(clean_kelp$change_ww), xlab="Theoretical Quantiles", ylab="Sample Quantiles", main="Q-Q Plot for Square Root Change in Kelp Wet Weight (g)")
+```
+
+After transforming the change in wet weight, we can conclude that the log transformation of change_ww is approximately normally distributed, while the square root transformation remains non-normal. Tables 1 and 2 depict the results of the corresponding Shapiro-Wilk tests. At significance level $\alpha = 0.05$, both transformations Shapiro-Wilk p-values remain significantly different from a normal distribution at $0.000698$ and $9.393e-07$ respectively. However, as sample size increases, tests like Shapiro-Wilk become more sensitive to small deviations in the distribution of the data. Thus examining Figure 4, combined with a p-value closer to $0.05$, and by the Central Limit Theorem, we can conclude that the log transformation of change_ww is approximately normal as the data roughly follows the normal line and most points remain within the confidence bands. Figure 5 shows that the square root transformed data appears to deviate too largely to claim normality.  
+  
+Using the normally distributed log transformation of wet weight change, we can graph it against our independent variables.
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=6, fig.cap="**Figure 6: Boxplot for Log Change of Wet Weight by Temperature**"}
+# box plot for y against temp
+#using log transformation since that was the closest to normal
+ggplot(clean_kelp, aes(x=Temp, y=log(change_ww+1))) +
+  geom_boxplot(color="black", fill="aquamarine") +
+  labs(x="Temperature", y="Log of Change in Wet Weight (log(g))", title="Boxplot of Change in Wet Weight by Temperature Grouping") +
+  theme_minimal()
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=6, fig.cap="**Figure 7: Boxplot for Log Change of Wet Weight by pH**"}
+# box plot for y against ph
+ggplot(clean_kelp, aes(x=pH, y=log(change_ww+1))) +
+  geom_boxplot(color="black", fill="tan") +
+  labs(x="pH", y="Log of Change in Wet Weight (log(g))", title="Boxplot of Change in Wet Weight by pH Grouping") +
+  theme_minimal()
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=6, fig.cap="**Figure 8: Scatterplot of Starting Weight against Log Change in Wet Weight**"}
+# scatterplot for y against numeric x
+ggplot(clean_kelp, aes(x=START_ww, y=log(change_ww+1))) +
+  geom_point(color="maroon") +
+  labs(x="Initial Wet Weight (g)", y="Log of Change in Wet Weight (log(g))", title="Scatterplot of Initial and Log Change in Wet Weight") +
+  theme_minimal()
+```
+  
+In Figure 6 for the log change in wet weight by temperature group, we can observe that while the medians for the two groups are similar, the interquartile range and spread of values for the control temperature groups is nearly double the size of the OW group. In Figure 7, we again observe similar medians, but also nearly identical IQRs, with the OA group being slightly shifted towards larger log values. Figure 8 indicates a possible positive linear trend between the two variables. As the initial wet weight increases, there is a slight trend of an increase apparent in the log change in wet weight, with a possible outlier around log weight of ~ 0.1 and initial weight 12.5.
+
+## Statistical Methods
+
+Based on our hypothesis and findings in the previous section, we will proceed with two statistical tests to our hypothesis in question. Our first statistical test will be a two-sample t-test comparing the mean log change in wet weight of the pH groups (control and OA). Given that we previously concluded normality in the log change, and that the observations are independent of each other (measured separately, no overlap in groups), the data represents a random sample from the population, and a Levene test (Table 5) revealed that the variances of both groups did not significantly differ from each other, our assumptions to proceed are validated. Following are the results of the Levene test for temperature (Figure 4) and pH respectively.
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.cap="**Tables 4 & 5: Levene's Tests for Temperature and pH Respectively**"}
+#run a levene test to check for equality of variance
+#add the log change var
+clean_kelp$log_change <- log(clean_kelp$change_ww + 1)
+
+#then run test for both categorical variables and save them as variables so I can make kable tables
+lev_temp <- leveneTest(clean_kelp$log_change, group=clean_kelp$Temp)
+lev_ph <- leveneTest(clean_kelp$log_change, group=clean_kelp$pH)
+
+#make the tables so it has a nice clean output
+kable(lev_temp, caption="Table 4: Levene's Test for Temperature Grouping", row.names=FALSE)
+kable(lev_ph, caption="Table 5: Levene's Test for pH Grouping", row.names=FALSE)
+```
+The significant difference between the variance of the two temperature groups is notable, and will be discussed further in regards to our second statistical test.  
+  
+Written explicitly, our hypothesis for the two-sample t-test is:
+$$H_0: \mu_c = \mu_{OA}$$
+$$H_A: \mu_c \neq \mu_{OA}$$
+Where $\mu_c$ is the mean of the control group and $\mu_{OA}$ is the mean of the OA group.
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+#Appendix 2
+
+# test 1 since we have 144 observations, the shapiro wilk value is closer to 0.05 but can be thrown off with larger samples
+# and the qqplot looks approx normal as discussed in these sections
+test1 <- t.test(log_change ~ pH, data=clean_kelp, var.equal=TRUE)
+
+#uncomment and run if you want to validate the confidence interval
+#test1
+```
+(See Appendix 2, or Results section for t-test output)  
+  
+Additionally, we will fit a linear model to predict the log change in wet weight based on the starting wet weight, temperature, and pH group. The explicit hypothesis for the model is:
+$$
+H_0: \beta_1=\beta_2=\beta_3=0
+$$
+Where $\beta_1, \beta_2, \beta_3$ are the coefficients for START_ww, Temp, and pH respectively.
+$$
+H_A: \text{At least one } \beta \neq 0
+$$
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+#Appendix 3
+
+#fit the linear model on the log change with all variables in the cleaned dataset as predictors
+# following in the report will be the validation of the model assumptions
+test2 <- lm(log_change ~ START_ww + Temp + pH, clean_kelp)
+```
+To ensure the validity of the regression results (see Appendix 3, or the Results section for table), we can observe the Shapiro-Wilk test (Table 6) for the residuals, as well as the Q-Q residuals and residuals vs. fitted plots (Figure 9). 
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.cap="**Table 6: Shapiro-Wilk Test for Linear Model Residuals**"}
+# check the plots to verify assumptions for linear model are met, and check the normality of the residuals with shapiro wilk too
+shap_linmodel <- shapiro.test(test2$residuals)
+shap_table4 <- data.frame(W=shap_linmodel$statistic, p_value=shap_linmodel$p.value)
+kable(shap_table4, caption="Table 6: Shapiro-Wilk of Residuals", row.names=FALSE)
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=6, fig.cap="**Figure 9: Linear Model Plots**"}
+#plot a 2x2 to save space, I plotted them each seperately and make them bigger so I could analyze for my assumptions
+#but for the purposes of the finished paper I made them smaller and 2x2
+par(mfrow=c(2,2))
+plot(test2)
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=6, fig.cap="**Table 7: Variance Inflation Factor for Predictors**"}
+#VIF
+#most of my stats classes have chosen VIF < 5 is good
+vif_vals <- vif(test2)
+kable(vif_vals, caption="Table 7: VIFs for Linear Model Predictors")
+```
+
+Although the Shapiro-Wilk p-value of $0.01314$ indicates that the residuals significantly deviate from being normally distributed, the larger sample size could explain this p-value as the test will be more sensitive to the slight deviations apparent in Figure 9. Additionally, by invoking the Central Limit Theorem, we can conclude that the residuals follow a normal distribution. Also in Figure 9, from the plot of the residuals against the fitted values, we can observe that the red line has slight curvature, but none too extreme given the sample size to violate the assumption of linearity. We can also validate that the errors are independent, the variance is roughly equal, and there is no multicollinearity as each kelp observation was measured independently, the square root of the standardized residuals appear to be constant and evenly spread on both sides of the line in the scale location plot, and all three independent variables have a VIF of about one (Table 7). It should be noted that the variance of the two temperature groups was found to be significantly different from a Levenes test, but as discussed in regards to the scale-location plot (Figure 9), we will continue with our variance assumption being satisfied.
+  
+## Results
+
+In order to test our hypothesis we ran two statistical tests. The first, having verified the assumptions in the previous section, was a two-sample t-test on the log change of wet weight by pH group. The output is as follows.
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.cap="**Table 8: Two-Sample t-Test Results: test statistic, degrees freedom, and p-value**"}
+#make a table with the information from the t test
+t_test_table <- data.frame(Statistic = test1$statistic, df=test1$parameter, p_value=test1$p.value)
+kable(t_test_table, caption="Table 8: Two-Sample t-test Results", row.names=FALSE)
+```
+The two-sample t-test of log change in wet weight by pH grouping had a resulting p-value of $0.37$, with a control group mean of $1.92$ and a OA group mean of $2.01$. At significance level $\alpha = 0.05$, we fail to reject the null hypothesis, and conclude that there is not enough evidence to claim a significant difference in the two means. Thus the mean of the pH control group is not significantly different than the mean of the OA group.  
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.width=6, fig.cap="**Figure 10: Confidence Interval Plot**"}
+# we want to plot the confidence interval as well so for this
+ci_data <- clean_kelp %>%
+  group_by(pH) %>%
+  summarise(
+    mean = mean(log_change),
+    se = sd(log_change)/sqrt(n()),
+    lower = mean - qt(0.975, n()-1) * se,
+    upper = mean + qt(0.975, n()-1) * se
+  )
+
+#then plot this confidence interval
+ggplot(ci_data, aes(x=pH, y=mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=lower, ymax=upper), width=0.1) +
+  labs(x="pH Group", y="Mean Log Change in Wet Weight",
+       title="95% Confidence Interval for Mean Log Change by pH Group") +
+  theme_minimal()
+```
+  
+The 95\% confidence interval (from t-Test, see Appendix 2) for the difference in means between the control and OA pH groups is roughly $(-0.297, 0.111)$. Since this interval contains zero then we fail to reject the null hypothesis, which is consistent with the resulting p-value from the t-test. This again suggests that there is no significant difference in mean log change in wet weight for the two pH groups. From Figure 10, we can see that the error bars of both groups overlap, indicating that the true means of each group can be possibly within the other groups interval, again supporting no significant difference between the group means.  
+  
+The second statistical test ran was a linear model to predict the log change in wet weight from predictors of starting wet weight, temperature OW group, and pH OA group. The results of the model are as shown.
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE, fig.cap="**Table 9: Linear Model Results Formatted in a Table. See Statistical Methods Section for Assumptions**"}
+#get the summary of the linear model but make it a variable for the kable table
+lm_summary <- summary(test2)$coefficients
+kable(lm_summary, caption="Table 9: Linear Model Results")
+```
+Having verified all model assumptions, we can now assess the model fit and regression coefficients in Table 9. The model intercept is $1.528$, and the coefficients are $0.080$, $-0.328$, and $0.035$ respectively. The model has an overall p-value of $4.578e-06$ on 140 degrees of freedom. Thus at a significance level of $\alpha = 0.05$, we reject the null hypothesis in favor of the alternate and conclude that at least one of the model coefficients is significantly different from zero. The model coefficients for starting wet weight, and temperature of the OW group, as well as the model intercept are all highly significant, while the coefficient for pH of the OA group is not. The categorical variable coefficients only represent OW and OA as the control groups are dummy-coded, meaning the intercept $\beta_0$ represents the expected log wet weight change when the starting wet weight is zero, and the temperature and pH groups are at their control level. Accounting for the multiple predictors, the model adjusted $R^2$ value of $0.160$ indicates that the model only explains roughly 16\% of the variation in log change in wet weight. 
+
+## Discussion
+
+In order to test our hypothesis that both temperature and pH have a statistically significant effect on the growth of *Neoagarum fimbriatum*, we ran two statistical tests. The variable of interest, change in wet weight, was first log transformed in order for it to better follow a normal distribution. A two-sample t-test was run to compare the log change in wet weight and the two pH groups present in the data, control and ocean acidification (OA). The t-test resulted in a p-value of $0.37$, meaning that at significance level $\alpha = 0.05$, we failed to reject the tests null hypothesis, and concluded that there was not significant evidence to support a difference in means of the two groups. Thus implying that there is insufficient evidence that pH significantly affects log change in wet weight, as the two groups means are not statistically different.  
+  
+A linear model was fit to predict the log change in wet weight using the kelps starting wet weight, temperature group, and pH group. The model had an overall p-value of $4.578e-06$, meaning that we rejected the null hypothesis in favor of the alternate, and concluded that at least one of the coefficients is significantly different from zero. We can observe that the only coefficient, including the intercept, that is not highly significant and greater than $\alpha = 0.05$ is the predictor for the OA pH group. This means that the temperature and starting weight both have significant effects on the log change in wet weight, while the OA pH group does not. The models adjusted $R^2$ value showed that our model explained approximately 16\% of variation in the log change of wet weight. This is not uncommon for ecological data as unmeasured factors can contribute substantially to the variability. However, the small value is worth noting and should be further looked in to, as it weakens the interpretation of our results.  
+
+The two tests inform each other in that the t-test shows that the pH groups do not differ in means, and the linear model suggests that the OA pH group is not a significant predictor once temperature and starting wet weight is accounted for. This implies that temperature could be a stronger influence on log change in wet weight. This consistency across both tests supports both temperature and starting weight as more influential factors of kelp growth than pH in this environment.
+  
+From our statistical tests, we gain insight into how different factors affect the kelp in our specific ecosystem. As discussed previously, prior research has shown that kelp growth is variable and dependent on seasonal and environmental factors. Using the data from Dr. Kroeker's research simulating both winter and summer conditions, and focusing on the *Neoagarum fimbriatum* species, we
+can make the following observations about the system. The starting wet weight of the kelp has a significant effect on the log change in wet weight with the OW temperature group also significantly contributing to log change compared to baseline levels. The OA pH group was found not to significantly contribute to kelp log change in weight, and the lack of evidence to support a difference in pH group means from the t-test further shows that pH is at least a less important variable in this system. More rigorous statistical testing would be needed to further investigate the effects of pH on this system, which as previously stated, could have more significant effects on different kelp species or when studied in different environments. Future studies on this data could explore such possibilities, as well as explore larger samples of the kelp or the other species in the data that were not included in our study. Another limitation of our study is the small adjusted $R^2$ value indicates poor model fit, and a model that includes additional predictors, a different transformation or a larger sample could potentially improve this. Similarly, we could expand our studied variables, as we do not include light or nutrient availability in our analysis, both critical factors for kelp growth. A limitation of the data coming from an experiment with a short duration (two month-long periods) is that it could limit our understanding of long-term patterns. 
+  
+Given that temperature was found to be a significant predictor of log change in wet weight, and with rising ocean temperatures driven by climate change, there could be meaningful implications for kelp growth in ecosystems similar to this one. If ocean temperatures continue to rise, then we may observe changes in kelp biomass as kelp wet weight decreases. Reduced kelp biomass in these ocean ecosystems would cause serious harm to marine life that relies on kelp as nurseries, food, and shelter. This study and ones similar to it provide an early foundation for understanding how individual environmental factors may negatively effect kelp ecosystems.
+
+
+## References
+
+Bell, L. E., Kroeker, K. J. (2023). Kelp growth data from seasonal global change experiments examining the effects of seasonal variation in light availability and nutrients on the response of three high-latitude kelp species. Biological and Chemical Oceanography Data Management Office (BCO-DMO). (Version 1) Version Date 2023-08-16 [if applicable, indicate subset used]. doi:10.26008/1912/bco-dmo.906317.1 2026, March 1
+  
+Britton, D., Cornwall, C. E., Revill, A. T., Hurd, C. L., & Johnson, C. R. (2016, May 27). Ocean acidification reverses the positive effects of seawater ph fluctuations on growth and photosynthesis of the habitat-forming kelp, Ecklonia radiata. Nature News. https://www.nature.com/articles/srep26036 
+  
+Fernandez, P. A., Roleda, M. Y., & Hurd, C. L. (2015, April 14). Effects of ocean acidification on the photosynthetic performance, carbonic anhydrase activity and growth of the giant kelp macrocystis pyrifera - photosynthesis research. SpringerLink. https://link.springer.com/article/10.1007/s11120-015-0138-5 
+  
+Fox, J., & Weisberg, S. (2019). An R companion to applied regression (3rd ed.). Sage. https://www.john-fox.ca/Companion/
+  
+Kroeker, K. J. (n.d.). Career: Energy fluxes and community stability in a dynamic, high-latitude Kelp Ecosystem. ADS. https://ui.adsabs.harvard.edu/abs/2018nsf....1752600K/abstract 
+  
+Wickham, H., Averick, M., Bryan, J., Chang, W., McGowan, L. D., François, R., Grolemund, G., Hayes, A., Henry, L., Hester, J., Kuhn, M., Pedersen, T. L., Miller, E., Bache, S. M., Müller, K., Ooms, J., Robinson, D., Seidel, D. P., Spinu, V., . . . Yutani, H. (2019). Welcome to the tidyverse. Journal of Open Source Software, 4(43), 1686. https://doi.org/10.21105/joss.01686
+  
+Wickham, H. (2016). ggplot2: Elegant graphics for data analysis. Springer-Verlag. https://ggplot2.tidyverse.org
+  
+Xie, Y. (2014). knitr: A comprehensive tool for reproducible research in R. In V. Stodden, F. Leisch, & R. D. Peng (Eds.), Implementing reproducible computational research. Chapman and Hall/CRC.
+
+## Appendix
+```{r}
+#load the data and packages
+#dataset 145
+kelp_data <- read.csv("data/dataset_145.csv")
+
+#for pipe operator and for graphing
+#citation: Wickham H, Averick M, Bryan J, Chang W, McGowan LD, François R, Grolemund G, Hayes A, Henry L, Hester J, Kuhn M, Pedersen TL, Miller E, Bache SM, Müller K, Ooms J, Robinson D, Seidel DP, Spinu V, Takahashi K, Vaughan D, Wilke C, Woo K, Yutani H (2019). “Welcome to the tidyverse.” Journal of Open Source Software, 4(43), 1686. doi:10.21105/joss.01686.
+library(tidyverse)
+
+#citation: Wickham H (2016). ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York. ISBN 978-3-319-24277-4, https://ggplot2.tidyverse.org.
+library(ggplot2)
+
+#for levenes test and for VIF
+#Fox J, Weisberg S (2019). An R Companion to Applied Regression, Third edition. Sage, Thousand Oaks CA. https://www.john-fox.ca/Companion/.
+library(car)
+
+#for making my tables look nice in the results section
+#Xie Y (2014). “knitr: A Comprehensive Tool for Reproducible Research in R.” In Stodden V, Leisch F, Peng RD (eds.), Implementing Reproducible Computational Research. Chapman and Hall/CRC. ISBN 978-1466561595.
+library(knitr)
+```
+**Appendix 1:**
+```{r, fig.cap="**Figure 1: Histogram of Kelp Change in Wet Weight**"}
+#Appendix 1
+
+# we want to subset the data like we did in the project check in
+kelp_subset <- kelp_data %>% 
+  select(Temp, pH, START_ww, change_ww)
+
+clean_kelp <- kelp_subset %>% #select all columns included in analysis
+  drop_na()
+
+#also change the categorical variables to factors
+clean_kelp$Temp <- as.factor(clean_kelp$Temp)
+clean_kelp$pH <- as.factor(clean_kelp$pH)
+
+# first lets start by visualizing the different variables
+# plot the histograms of the numeric y
+
+ggplot(clean_kelp, aes(x=change_ww)) +
+  geom_histogram(binwidth=1, color="black", fill="skyblue") + 
+  labs(x="Change in Wet Weight (g)", y="Frequency", title="Distribution of Kelp Change in Wet Weight") +
+  theme_minimal()
+```
+```{r, fig.cap="**Figure 2: Histogram of Kelp Change in Wet Weight**"}
+# then histogram for numeric x
+ggplot(clean_kelp, aes(x=START_ww)) +
+  geom_histogram(binwidth=1, color="black", fill="darkseagreen") + 
+  labs(x="Starting Wet Weight (g)", y="Frequency", title="Distribution of Kelp Starting Wet Weight") +
+  theme_minimal()
+```
+```{r, fig.cap="**Table 1: Output of Shapiro-Wilk Test for Change in Wet Weight**"}
+# then since it doesnt look normal check shapiro wilk/qqplot and then transform and check that
+shap_change <- shapiro.test(clean_kelp$change_ww)
+shap_table1 <- data.frame(W=shap_change$statistic, p_value=shap_change$p.value)
+kable(shap_table1, caption="Change in Wet Weight Shapiro-Wilk Results")
+```
+```{r, fig.cap="**Figure 3: Q-Q Plot for Change in Kelp Wet Weight**"}
+#make the qqplot and add labels
+qqPlot(clean_kelp$change_ww, xlab="Theoretical Quantiles", ylab="Sample Quantiles", main="Q-Q Plot for Change in Kelp Wet Weight (g)")
+```
+```{r, fig.cap="**Tables 2 & 3: Outputs of Shapiro-Wilk Tests for Transformed Wet Weight Change (Log and Sqrt Respectively)**"}
+#try log
+shap_logchange <- shapiro.test(log(clean_kelp$change_ww+1))
+#try sqrt
+shap_sqrtchange <- shapiro.test(sqrt(clean_kelp$change_ww))
+
+shap_table2 <- data.frame(W=shap_logchange$statistic, p_value=shap_logchange$p.value)
+shap_table3 <- data.frame(W=shap_sqrtchange$statistic, p_value=shap_sqrtchange$p.value)
+kable(shap_table2, caption="Log Change in Wet Weight Shapiro-Wilk Results", row.names=FALSE)
+kable(shap_table3, caption="Sqrt Change in Wet Weight Shapiro-Wilk Results", row.names=FALSE)
+```
+```{r, fig.cap="**Figures 4 & 5: Q-Q Plots for Transformed Change in Wet Weight (Log and Sqrt Respectively)**"}
+#qqplots and label them, for the log and sqrt transforms
+qqPlot(log(clean_kelp$change_ww+1), xlab="Theoretical Quantiles", ylab="Sample Quantiles", main="Q-Q Plot for Log Change in Kelp Wet Weight (g)")
+qqPlot(sqrt(clean_kelp$change_ww), xlab="Theoretical Quantiles", ylab="Sample Quantiles", main="Q-Q Plot for Square Root Change in Kelp Wet Weight (g)")
+```
+```{r, fig.width=6, fig.cap="**Figure 6: Boxplot for Log Change of Wet Weight by Temperature**"}
+# box plot for y against temp
+#using log transformation since that was the closest to normal
+ggplot(clean_kelp, aes(x=Temp, y=log(change_ww+1))) +
+  geom_boxplot(color="black", fill="aquamarine") +
+  labs(x="Temperature", y="Log of Change in Wet Weight (log(g))", title="Boxplot of Change in Wet Weight by Temperature Grouping") +
+  theme_minimal()
+```
+```{r, fig.cap="**Figure 7: Boxplot for Log Change of Wet Weight by pH**"}
+# box plot for y against ph
+ggplot(clean_kelp, aes(x=pH, y=log(change_ww+1))) +
+  geom_boxplot(color="black", fill="tan") +
+  labs(x="pH", y="Log of Change in Wet Weight (log(g))", title="Boxplot of Change in Wet Weight by pH Grouping") +
+  theme_minimal()
+```
+```{r, fig.width=6, fig.cap="**Figure 8: Scatterplot of Starting Weight against Log Change in Wet Weight**"}
+# scatterplot for y against numeric x
+ggplot(clean_kelp, aes(x=START_ww, y=log(change_ww+1))) +
+  geom_point(color="maroon") +
+  labs(x="Initial Wet Weight (g)", y="Log of Change in Wet Weight (log(g))", title="Scatterplot of Initial and Log Change in Wet Weight") +
+  theme_minimal()
+```
+```{r, fig.cap="**Tables 4 & 5: Levene's Tests for Temperature and pH Respectively**"}
+#run a levene test to check for equality of variance
+#add the log change var
+clean_kelp$log_change <- log(clean_kelp$change_ww + 1)
+
+#then run test for both categorical variables and save them as variables so I can make kable tables
+lev_temp <- leveneTest(clean_kelp$log_change, group=clean_kelp$Temp)
+lev_ph <- leveneTest(clean_kelp$log_change, group=clean_kelp$pH)
+
+#make the tables so it has a nice clean output
+kable(lev_temp, caption="Levene's Test for Temperature Grouping", row.names=FALSE)
+kable(lev_ph, caption="Levene's Test for pH Grouping", row.names=FALSE)
+```
+
+**Appendix 2:**
+```{r}
+#Appendix 2
+
+# test 1 since we have 144 observations, the shapiro wilk value is closer to 0.05 but can be thrown off with larger samples
+# and the qqplot looks approx normal as discussed in these sections
+test1 <- t.test(log_change ~ pH, data=clean_kelp, var.equal=TRUE)
+test1
+```
+**Appendix 3:**
+```{r}
+#Appendix 3
+
+#fit the linear model on the log change with all variables in the cleaned dataset as predictors
+# following in the report will be the validation of the model assumptions
+test2 <- lm(log_change ~ START_ww + Temp + pH, clean_kelp)
+test2
+```
+```{r, fig.cap="**Table 6: Shapiro-Wilk Test for Linear Model Residuals**"}
+# check the plots to verify assumptions for linear model are met, and check the normality of the residuals with shapiro wilk too
+shap_linmodel <- shapiro.test(test2$residuals)
+shap_table4 <- data.frame(W=shap_linmodel$statistic, p_value=shap_linmodel$p.value)
+kable(shap_table4, caption="Shapiro-Wilk of Residuals", row.names=FALSE)
+```
+```{r, fig.width=6, fig.cap="**Figure 9: Linear Model Plots**"}
+#plot a 2x2 to save space, I plotted them each seperately and make them bigger so I could analyze for my assumptions
+#but for the purposes of the finished paper I made them smaller and 2x2
+par(mfrow=c(2,2))
+plot(test2)
+```
+```{r, fig.width=6, fig.cap="**Table 7: Variance Inflation Factor for Predictors**"}
+#VIF
+#most of my stats classes have chosen VIF < 5 is good
+vif_vals <- vif(test2)
+kable(vif_vals, caption="VIFs for Linear Model Predictors")
+```
+```{r, fig.cap="**Table 8: Two-Sample t-Test Results: test statistic, degrees freedom, and p-value**"}
+#make a table with the information from the t test
+t_test_table <- data.frame(Statistic = test1$statistic, df=test1$parameter, p_value=test1$p.value)
+kable(t_test_table, caption="Two-Sample t-test", row.names=FALSE)
+```
+```{r, fig.width=6, fig.cap="**Figure 10: Confidence Interval Plot**"}
+# we want to plot the confidence interval as well so for this
+ci_data <- clean_kelp %>%
+  group_by(pH) %>%
+  summarise(
+    mean = mean(log_change),
+    se = sd(log_change)/sqrt(n()),
+    lower = mean - qt(0.975, n()-1) * se,
+    upper = mean + qt(0.975, n()-1) * se
+  )
+
+#then plot this confidence interval
+ggplot(ci_data, aes(x=pH, y=mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin=lower, ymax=upper), width=0.1) +
+  labs(x="pH Group", y="Mean Log Change in Wet Weight",
+       title="95% Confidence Interval for Mean Log Change by pH Group") +
+  theme_minimal()
+```
+```{r, fig.cap="**Table 9: Linear Model Results Formatted in a Table. See Statistical Methods Section for Assumptions**"}
+#get the summary of the linear model but make it a variable for the kable table
+lm_summary <- summary(test2)$coefficients
+kable(lm_summary, caption="Linear Model Results")
+```
